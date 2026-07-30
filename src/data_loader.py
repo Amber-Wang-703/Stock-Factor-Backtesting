@@ -1,40 +1,104 @@
-from pathlib import Path
+import pandas as pd
+import os
+import glob
 
-import yfinance as yf
+
+DATA_PATH = "data/raw/SP500_Data_10Y"
 
 
-def download_stock_data(
-    ticker: str,
-    start_date: str,
-    end_date: str,
-) -> None:
-    """Download historical stock data and save it as a CSV file."""
+def load_stock_data():
 
-    data = yf.download(
-        ticker,
-        start=start_date,
-        end=end_date,
-        auto_adjust=False,
-        progress=False,
+    all_files = glob.glob(
+        os.path.join(DATA_PATH, "*.csv")
     )
 
-    if data.empty:
-        raise ValueError(f"No data downloaded for {ticker}")
+    stock_list = []
 
-    project_root = Path(__file__).resolve().parent.parent
-    data_folder = project_root / "data"
-    data_folder.mkdir(exist_ok=True)
+    for file in all_files:
 
-    output_path = data_folder / f"{ticker}.csv"
-    data.to_csv(output_path)
+        ticker = os.path.basename(file).replace(".csv", "")
 
-    print(data.head())
-    print(f"\nSaved {ticker} data to: {output_path}")
+        try:
+            df = pd.read_csv(file, header=[0,1])
+
+            # flatten multi-index columns
+            df.columns = [
+                col[0] if col[0] != "Price" else col[1]
+                for col in df.columns
+            ]
+
+            # reset first column name
+            df = df.rename(columns={
+                df.columns[0]: "Date"
+            })
+
+            df["Ticker"] = ticker
+
+
+            # remove wrong rows
+            df = df[df["Date"] != "Date"]
+
+
+            # convert date
+            df["Date"] = pd.to_datetime(
+                df["Date"],
+                errors="coerce"
+            )
+
+
+            # convert numbers
+            cols = [
+                "Close",
+                "High",
+                "Low",
+                "Open",
+                "Volume"
+            ]
+
+            for c in cols:
+                df[c] = pd.to_numeric(
+                    df[c],
+                    errors="coerce"
+                )
+
+
+            df = df.dropna()
+
+
+            stock_list.append(df)
+
+
+            print("Loaded", ticker)
+
+
+        except Exception as e:
+            print(
+                "Error:",
+                ticker,
+                e
+            )
+
+
+    data = pd.concat(
+        stock_list,
+        ignore_index=True
+    )
+
+
+    data = data.sort_values(
+        ["Ticker","Date"]
+    )
+
+
+    return data
+
 
 
 if __name__ == "__main__":
-    download_stock_data(
-        ticker="AAPL",
-        start_date="2015-01-01",
-        end_date="2025-01-01",
-    )
+
+    data = load_stock_data()
+
+    print("\nFinished!")
+    print(data.head())
+    print(data.columns)
+    print(data.shape)
