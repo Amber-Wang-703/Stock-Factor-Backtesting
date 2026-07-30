@@ -2,9 +2,6 @@ import pandas as pd
 import numpy as np
 
 
-# ===============================
-# 1. Daily Return
-# ===============================
 def calculate_returns(data):
 
     data = data.copy()
@@ -23,104 +20,148 @@ def calculate_returns(data):
 
 
 
-# ===============================
-# 2. Momentum Factor
-# ===============================
-def calculate_momentum(data, window=60):
+def calculate_momentum(data):
 
     data = data.copy()
 
-    data["Momentum"] = (
+    close = (
         data
         .groupby("Ticker")["Close"]
-        .transform(
-            lambda x: x.pct_change(window)
-        )
+    )
+
+    # 12 month momentum
+    data["Momentum_12M"] = (
+        close
+        .pct_change(252)
+    )
+
+    # 6 month momentum
+    data["Momentum_6M"] = (
+        close
+        .pct_change(126)
+    )
+
+    # short term reversal
+    data["Reversal_5D"] = (
+        close
+        .pct_change(5)
     )
 
     return data
 
 
 
-# ===============================
-# 3. Volatility Factor
-# ===============================
-def calculate_volatility(data, window=60):
+def calculate_risk(data):
 
     data = data.copy()
 
-    data["Volatility"] = (
+
+    returns = (
         data
         .groupby("Ticker")["Daily_Return"]
+    )
+
+
+    # 60 day volatility
+    data["Volatility"] = (
+        returns
         .transform(
-            lambda x: x.rolling(window).std()
+            lambda x:
+            x.rolling(60).std()
         )
     )
+
+
+    # downside volatility
+    data["Downside_Volatility"] = (
+        returns
+        .transform(
+            lambda x:
+            x.where(x < 0)
+             .rolling(60)
+             .std()
+        )
+    )
+
 
     return data
 
 
 
-# ===============================
-# 4. Moving Average Trend Factor
-# ===============================
-def calculate_ma_factor(data, window=60):
+def calculate_trend(data):
 
     data = data.copy()
 
-    ma = (
+
+    close = (
         data
         .groupby("Ticker")["Close"]
-        .transform(
-            lambda x: x.rolling(window).mean()
-        )
     )
 
-    data["MA_Factor"] = (
-        data["Close"] / ma - 1
-    )
+
+    for window in [20, 60, 200]:
+
+        ma = (
+            close
+            .transform(
+                lambda x:
+                x.rolling(window).mean()
+            )
+        )
+
+
+        data[f"MA{window}_Distance"] = (
+            data["Close"] / ma - 1
+        )
+
 
     return data
 
 
 
-# ===============================
-# 5. Volume Factor
-# ===============================
-def calculate_volume_factor(data, window=60):
+def calculate_liquidity(data):
 
     data = data.copy()
+
+
+    # dollar volume
+    data["Dollar_Volume"] = (
+        data["Close"] *
+        data["Volume"]
+    )
+
 
     avg_volume = (
         data
         .groupby("Ticker")["Volume"]
         .transform(
-            lambda x: x.rolling(window).mean()
+            lambda x:
+            x.rolling(20).mean()
         )
     )
 
-    data["Volume_Factor"] = (
-        data["Volume"] / avg_volume
+
+    data["Volume_Change"] = (
+        data["Volume"] /
+        avg_volume - 1
     )
+
 
     return data
 
 
 
-# ===============================
-# Combine All Factors
-# ===============================
 def calculate_factors(data):
 
     data = calculate_returns(data)
 
     data = calculate_momentum(data)
 
-    data = calculate_volatility(data)
+    data = calculate_risk(data)
 
-    data = calculate_ma_factor(data)
+    data = calculate_trend(data)
 
-    data = calculate_volume_factor(data)
+    data = calculate_liquidity(data)
 
 
     return data

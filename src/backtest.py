@@ -3,25 +3,26 @@ import numpy as np
 
 
 def backtest_strategy(data, top_n=10):
-    """
-    Simple factor strategy backtest
-    
-    Every day:
-    1. Select top N stocks by Factor_Score
-    2. Hold for next trading day
-    3. Calculate portfolio return
-    """
 
     data = data.copy()
 
-    # sort by date
-    data = data.sort_values(["Date", "Factor_Score"], ascending=[True, False])
+
+    # ensure sorted
+    data = data.sort_values(
+        ["Date", "Factor_Score"],
+        ascending=[True, False]
+    )
+
+
+    dates = (
+        data["Date"]
+        .drop_duplicates()
+        .sort_values()
+        .tolist()
+    )
 
 
     portfolio_returns = []
-
-
-    dates = data["Date"].unique()
 
 
     for i in range(len(dates)-1):
@@ -30,10 +31,17 @@ def backtest_strategy(data, top_n=10):
         tomorrow = dates[i+1]
 
 
-        # today's top stocks
-        today_data = data[data["Date"] == today]
+        # today's ranking
+        today_data = data[
+            data["Date"] == today
+        ]
 
-        top_stocks = (
+
+        if len(today_data) < top_n:
+            continue
+
+
+        selected = (
             today_data
             .sort_values(
                 "Factor_Score",
@@ -43,29 +51,62 @@ def backtest_strategy(data, top_n=10):
         )
 
 
+        selected_tickers = (
+            selected["Ticker"]
+            .tolist()
+        )
+
+
         # next day return
-        next_day_data = data[
+        next_day = data[
             (data["Date"] == tomorrow)
             &
-            (data["Ticker"].isin(top_stocks["Ticker"]))
+            (data["Ticker"].isin(selected_tickers))
         ]
 
 
-        if len(next_day_data) > 0:
-
-            daily_return = (
-                next_day_data["Daily_Return"]
-                .mean()
-            )
-
-            portfolio_returns.append(
-                {
-                    "Date": tomorrow,
-                    "Return": daily_return
-                }
-            )
+        # not enough stocks
+        if len(next_day) < 3:
+            continue
 
 
-    result = pd.DataFrame(portfolio_returns)
+        # equal weighted portfolio
+        daily_return = (
+            next_day["Daily_Return"]
+            .mean()
+        )
+
+
+        portfolio_returns.append(
+            {
+                "Date": tomorrow,
+                "Return": daily_return,
+                "Num_Stocks": len(next_day)
+            }
+        )
+
+
+    result = pd.DataFrame(
+        portfolio_returns
+    )
+
+
+    if len(result) == 0:
+        print(
+            "Warning: No backtest results generated."
+        )
+        return pd.DataFrame(
+            columns=[
+                "Date",
+                "Return",
+                "Num_Stocks"
+            ]
+        )
+
+
+    result = result.sort_values(
+        "Date"
+    )
+
 
     return result
