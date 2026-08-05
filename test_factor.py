@@ -1,9 +1,12 @@
+import os
+import pandas as pd
+
 from src.data_loader import load_stock_data
 from src.factors import calculate_factors
-from src.scoring import calculate_factor_score
 from src.ranking import rank_stocks
 from src.backtest import backtest_strategy
 from src.performance import calculate_performance
+
 
 
 # ==========================
@@ -12,11 +15,19 @@ from src.performance import calculate_performance
 
 print("Loading data...")
 
+
 data = load_stock_data()
 
+
 print("\nRaw Data:")
+
 print(data.head())
-print(data.shape)
+
+print(
+    "Shape:",
+    data.shape
+)
+
 
 
 # ==========================
@@ -25,52 +36,36 @@ print(data.shape)
 
 print("\nCalculating factors...")
 
-data = calculate_factors(data)
 
-print("\nFactor Columns:")
-print(data.columns)
-
-
-# ==========================
-# 3. Calculate Factor Score
-# ==========================
-
-print("\nCalculating factor score...")
-
-data = calculate_factor_score(data)
-
-
-print("\nAfter Scoring:")
-print(
-    data[
-        [
-            "Date",
-            "Ticker",
-            "Factor_Score"
-        ]
-    ].head()
+data = calculate_factors(
+    data
 )
 
 
+print("\nFactor Columns:")
+
+print(data.columns)
+
+
+
 # ==========================
-# 4. Clean Data
+# 3. Clean Data
 # ==========================
 
 print("\nCleaning data...")
 
 
-factor_columns = [
-    "Factor_Score"
-]
-
-
 data = data.dropna(
-    subset=factor_columns
+    subset=[
+        "Composite_Factor_Score"
+    ]
 )
 
 
-print("Clean Data Shape:")
-print(data.shape)
+print(
+    "Clean Data Shape:",
+    data.shape
+)
 
 
 print(
@@ -89,7 +84,7 @@ print(
 
 
 # ==========================
-# 5. Ranking
+# 4. Ranking
 # ==========================
 
 print("\nRanking stocks...")
@@ -101,22 +96,26 @@ ranked_data = rank_stocks(
 )
 
 
-print("\nTop Stocks:")
+print(
+    "\nTop Stocks:"
+)
+
 
 print(
     ranked_data[
         [
             "Date",
             "Ticker",
-            "Factor_Score"
+            "Composite_Factor_Score"
         ]
-    ].head(30)
+    ]
+    .head(30)
 )
 
 
 
 # ==========================
-# 6. Backtest
+# 5. Backtest
 # ==========================
 
 print("\nRunning Backtest...")
@@ -128,7 +127,10 @@ returns = backtest_strategy(
 )
 
 
-print("\nBacktest Result:")
+print(
+    "\nBacktest Result:"
+)
+
 
 print(
     returns.head()
@@ -143,22 +145,80 @@ print(
 
 
 # ==========================
-# 7. Performance
+# 6. Performance
 # ==========================
 
 if len(returns) > 0:
 
-    print("\nPerformance:")
+
+    print(
+        "\nPerformance:"
+    )
+
 
     performance = calculate_performance(
         returns
     )
 
-    print(performance)
+
+    print(
+        performance
+    )
+
+
+
+    # ======================
+    # Save Results
+    # ======================
+
+
+    print(
+        "\nSaving results..."
+    )
+
+
+    os.makedirs(
+        "results",
+        exist_ok=True
+    )
+
+
+    # Performance summary
+
+    pd.DataFrame(
+        [performance]
+    ).to_csv(
+        "results/performance_summary.csv",
+        index=False
+    )
+
+
+    # Daily strategy returns
+
+    returns.to_csv(
+        "results/strategy_returns.csv",
+        index=False
+    )
+
+
+    # Selected stocks
+
+    ranked_data.to_csv(
+        "results/top_stocks.csv",
+        index=False
+    )
+
+
+    print(
+        "Results saved successfully."
+    )
+
 
 
 else:
 
+
     print(
-        "\nNo backtest results generated."
+        "No backtest results generated."
     )
+    
