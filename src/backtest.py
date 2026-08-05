@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 
 
 def backtest_strategy(data, top_n=10):
@@ -7,10 +6,17 @@ def backtest_strategy(data, top_n=10):
     data = data.copy()
 
 
-    # ensure sorted
+    # sort by date and factor score
+
     data = data.sort_values(
-        ["Date", "Factor_Score"],
-        ascending=[True, False]
+        [
+            "Date",
+            "Composite_Factor_Score"
+        ],
+        ascending=[
+            True,
+            False
+        ]
     )
 
 
@@ -31,7 +37,8 @@ def backtest_strategy(data, top_n=10):
         tomorrow = dates[i+1]
 
 
-        # today's ranking
+        # today's universe
+
         today_data = data[
             data["Date"] == today
         ]
@@ -41,10 +48,12 @@ def backtest_strategy(data, top_n=10):
             continue
 
 
+        # select top stocks
+
         selected = (
             today_data
             .sort_values(
-                "Factor_Score",
+                "Composite_Factor_Score",
                 ascending=False
             )
             .head(top_n)
@@ -57,7 +66,8 @@ def backtest_strategy(data, top_n=10):
         )
 
 
-        # next day return
+        # next day returns
+
         next_day = data[
             (data["Date"] == tomorrow)
             &
@@ -65,12 +75,12 @@ def backtest_strategy(data, top_n=10):
         ]
 
 
-        # not enough stocks
         if len(next_day) < 3:
             continue
 
 
-        # equal weighted portfolio
+        # equal weighted return
+
         daily_return = (
             next_day["Daily_Return"]
             .mean()
@@ -92,9 +102,11 @@ def backtest_strategy(data, top_n=10):
 
 
     if len(result) == 0:
+
         print(
             "Warning: No backtest results generated."
         )
+
         return pd.DataFrame(
             columns=[
                 "Date",
